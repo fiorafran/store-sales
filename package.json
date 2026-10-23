@@ -8,7 +8,8 @@
     "start": "node --no-warnings --env-file-if-exists=.env src/server.js",
     "dev": "node --no-warnings --env-file-if-exists=.env --watch src/server.js",
     "scrape": "node --no-warnings --env-file-if-exists=.env src/scrape-cli.js",
-    "build": "node --no-warnings --env-file-if-exists=.env src/build.js"
+    "build": "node --no-warnings --env-file-if-exists=.env src/build.js",
+    "steam": "node --no-warnings --env-file-if-exists=.env src/steam-cli.js"
   },
   "engines": {
     "node": ">=22.9"

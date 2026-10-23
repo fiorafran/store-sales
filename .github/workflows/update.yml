@@ -20,7 +20,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -51,6 +51,8 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_MIN_DISCOUNT: ${{ vars.DISCORD_MIN_DISCOUNT || '50' }}
           DISCORD_TOP_RANK: ${{ vars.DISCORD_TOP_RANK || '100' }}
+          STEAM_DOLLAR: ${{ vars.STEAM_DOLLAR || 'oficial' }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
 
       # Un solo commit que se pisa cada vez: el repo no crece con cada actualización
       - name: Guardar la base de datos en la rama "data"

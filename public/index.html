@@ -52,6 +52,14 @@
       <option value="1">Incluido en Game Pass</option>
       <option value="0">Sin Game Pass</option>
     </select>
+    <select id="steam" aria-label="Comparación con Steam">
+      <option value="">Steam: todos</option>
+      <option value="has">Con precio en Steam</option>
+      <option value="xbox">Más barato en Xbox</option>
+      <option value="steam">Más barato en Steam</option>
+      <option value="steamSale">En oferta en Steam</option>
+      <option value="bothSale">En oferta en las dos</option>
+    </select>
     <label class="range">Descuento mín. <strong id="minDiscountLabel">0%</strong>
       <input id="minDiscount" type="range" min="0" max="90" step="10" value="0">
     </label>
@@ -59,6 +67,7 @@
       <option value="">Orden por defecto</option>
       <option value="discount">Mayor descuento</option>
       <option value="drop">Mayor bajada de precio</option>
+      <option value="steam_diff">Mayor diferencia con Steam</option>
       <option value="price_asc">Precio: menor a mayor</option>
       <option value="price_desc">Precio: mayor a menor</option>
       <option value="popular">Más populares</option>

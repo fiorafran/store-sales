@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { steamComparison, steamHistory, steamStatus, fxRate } from './steam.js';
 import { DEFAULT_LOCALE, LOCALES, REFRESH_HOURS } from './config.js';
 
 // Arma los datos que consume el frontend: un JSON por mercado con todos los juegos e historial.
@@ -65,11 +66,27 @@ export function exportLocale(locale) {
     };
   });
 
+  // Comparación con Steam: precio convertido a la moneda de Xbox y cuál conviene
+  for (const g of games) {
+    const steam = steamComparison(g.id, locale, { price: g.price, currency: rows[0].currency });
+    if (steam) g.steam = { ...steam, status: 'priced', history: steamHistory(steam.itemKey, locale) };
+    else {
+      const { row, ...info } = steamStatus(g.id, locale);
+      g.steam = info; // { status, reason? , appid?, name?, itemName?, company? }
+    }
+  }
+  const steamCurrency = games.find((g) => g.steam.status === 'priced')?.steam.currency;
+  const fx = steamCurrency && rows[0] ? fxRate(steamCurrency, rows[0].currency) : null;
+
   return {
     locale,
     currency: rows[0]?.currency ?? null,
     updatedAt: lastRun?.finished_at ?? null,
     lastError: lastRun?.error ?? null,
+    // Repo de GitHub para el botón "Reportar comparación incorrecta" (en Actions viene solo)
+    reportRepo: process.env.GITHUB_REPOSITORY || process.env.REPORT_REPO || null,
+    // Tipo de cambio usado para convertir Steam (solo si las monedas difieren, ej. USD → ARS)
+    fx: fx && fx.rate !== 1 ? { from: steamCurrency, rate: fx.rate, source: fx.source, fetchedAt: fx.fetchedAt } : null,
     games,
   };
 }

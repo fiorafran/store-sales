@@ -37,6 +37,31 @@ export const LISTS = {
   newest: { orderby: 'ReleaseDate desc', maxPages: 4 },
 };
 
+// Comparación con Steam
+export const STEAM = {
+  // País de Steam e idioma de búsqueda para cada mercado de Xbox
+  markets: {
+    'es-AR': { cc: 'ar', lang: 'spanish', currency: 'USD' },
+    'es-MX': { cc: 'mx', lang: 'spanish', currency: 'MXN' },
+    'es-CL': { cc: 'cl', lang: 'spanish', currency: 'CLP' },
+    'es-CO': { cc: 'co', lang: 'spanish', currency: 'COP' },
+    'pt-BR': { cc: 'br', lang: 'brazilian', currency: 'BRL' },
+    'es-ES': { cc: 'es', lang: 'spanish', currency: 'EUR' },
+    'en-US': { cc: 'us', lang: 'english', currency: 'USD' },
+  },
+  // Key de la Web API de Steam (https://steamcommunity.com/dev/apikey): permite bajar la lista completa de
+  // juegos y emparejar casi todo al instante. Sin key se usa solo la búsqueda por nombre (más lenta).
+  apiKey: process.env.STEAM_API_KEY || '',
+  // Búsquedas por nombre por actualización, para los juegos que no aparecen en la lista completa
+  matchesPerRun: Number(process.env.STEAM_MATCHES_PER_RUN) || 150,
+  // Pausa entre búsquedas, para quedar debajo del límite de Steam (~200 pedidos cada 5 min)
+  searchDelayMs: Number(process.env.STEAM_SEARCH_DELAY_MS) || 1600,
+  // Cada cuántos días se vuelve a buscar un juego que no se encontró (puede salir en Steam después)
+  retryUnmatchedDays: 14,
+  // Tipo de dólar de dolarapi.com para convertir precios de Steam (USD) a pesos: oficial, tarjeta, blue, mep…
+  dollarType: process.env.STEAM_DOLLAR || 'oficial',
+};
+
 // Bot de Discord (opcional). Se configura en .env — ver README
 export const DISCORD = {
   token: process.env.DISCORD_TOKEN || '',

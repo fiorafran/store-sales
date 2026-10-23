@@ -3,6 +3,7 @@
 import express from 'express';
 import { db } from './db.js';
 import { scrape, isScraping } from './scraper.js';
+import { updateSteam } from './steam.js';
 import { cached, clearCache } from './cache.js';
 import { rateLimit } from './rate-limit.js';
 import { exportMeta, exportLocale } from './export.js';
@@ -29,14 +30,24 @@ app.use(['/api', '/data'], rateLimit({ windowMs: 60_000, max: 120 }));
 
 // Los mismos JSON que genera el build estático. Se arman una vez y se guardan en memoria
 // hasta la próxima actualización de precios (único momento en que cambian).
+// Si otro proceso escribió en la base (ej. `npm run steam` en otra terminal), la caché queda vieja.
+// SQLite incrementa data_version cuando otra conexión confirma cambios: en ese caso se vacía.
+let dataVersion = null;
+app.use('/data', (req, res, next) => {
+  const { data_version: v } = db.prepare('PRAGMA data_version').get();
+  if (v !== dataVersion) { clearCache(); dataVersion = v; }
+  next();
+});
+
+// no-cache: el navegador revalida siempre (con ETag, si no cambió responde 304 sin reenviar el JSON)
 app.get('/data/meta.json', (req, res) => {
-  res.set('Cache-Control', 'public, max-age=60').json(cached('meta', exportMeta));
+  res.set('Cache-Control', 'no-cache').json(cached('meta', exportMeta));
 });
 
 app.get('/data/:locale.json', (req, res) => {
   const { locale } = req.params;
   if (!LOCALES[locale]) return res.status(404).json({ error: 'No encontrado' });
-  res.set('Cache-Control', 'public, max-age=60').json(cached(`locale:${locale}`, () => exportLocale(locale)));
+  res.set('Cache-Control', 'no-cache').json(cached(`locale:${locale}`, () => exportLocale(locale)));
 });
 
 // Próximo momento en que se permite una actualización manual (null = ya se puede)
@@ -80,6 +91,8 @@ app.use((err, req, res, next) => {
 async function runScrape(locale) {
   try {
     await scrape(locale);
+    clearCache(); // los precios de Xbox se ven ya, sin esperar a Steam (que puede tardar varios minutos)
+    await updateSteam(locale);
   } catch (err) {
     console.error(`Error al actualizar ${locale}:`, err.message);
   } finally {

@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY src ./src
 COPY public ./public
+COPY steam-overrides.json ./
 
 # La base SQLite vive en un volumen para no perder el historial en cada deploy
 RUN mkdir -p /data && chown node:node /data

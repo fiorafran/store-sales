@@ -1,0 +1,4 @@
+{
+  "_ayuda": "Correcciones manuales del emparejamiento Xbox → Steam. Clave: ID del producto de Xbox (el que aparece en la URL de xbox.com, ej. 9NBLGGH4R315). Valor: appid de Steam (el número en store.steampowered.com/app/NUMERO) o null para indicar que no tiene equivalente. Las claves que empiezan con _ se ignoran.",
+  "_ejemplo": { "9NBLGGH4R315": 990080, "9P0W15K4K75S": null }
+}

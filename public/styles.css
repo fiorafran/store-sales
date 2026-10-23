@@ -9,6 +9,7 @@
   --green-hi: #2fbf3b;
   --sale: #ffd23f;
   --drop: #4fc3f7;
+  --steam: #66c0f4;
   --radius: 10px;
   color-scheme: dark;
 }
@@ -95,6 +96,48 @@ main { padding: 0 24px 40px; }
 .price { font-weight: 700; font-size: 15px; }
 .price.free { color: var(--green-hi); }
 .old { color: var(--muted); text-decoration: line-through; font-size: 12px; }
+/* Precio por tienda en la tarjeta */
+.store-rows { margin-top: auto; display: flex; flex-direction: column; gap: 3px; }
+.store-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; padding: 3px 6px; border-radius: 6px; border: 1px solid transparent; }
+.store-row .store { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; width: 40px; }
+.store-row.xbox .store { color: var(--green-hi); }
+.store-row.steam .store { color: var(--steam); }
+.store-row .price { font-size: 14px; }
+.store-row.muted { color: var(--muted); font-size: 12px; }
+.store-row.best { background: rgba(47, 191, 59, .12); border-color: rgba(47, 191, 59, .45); }
+.off { font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; color: #111; }
+.off.xbox { background: var(--sale); }
+.off.steam { background: var(--steam); }
+.badge.steam { background: var(--steam); color: #111; }
+.verdict { font-size: 12px; font-weight: 700; }
+.verdict.xbox { color: var(--green-hi); }
+.verdict.steam { color: var(--steam); }
+.verdict.equal { color: var(--muted); }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.legend .lx { background: var(--green-hi); }
+.legend .ls { background: var(--steam); }
+.compare { grid-column: 1 / -1; background: var(--panel-2); border-radius: 10px; padding: 12px 14px; }
+.summary { margin: 12px 0 0; line-height: 1.5; }
+.compare-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.compare-table th, .compare-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.compare-table tbody th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; width: 32%; }
+.compare-table thead th { font-size: 15px; }
+.compare-table thead th.xbox { color: var(--green-hi); }
+.compare-table thead th.steam { color: var(--steam); }
+.compare-table td small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+.compare-table .best { background: rgba(47, 191, 59, .10); }
+.compare-table tfoot td, .compare-table tfoot th { border-bottom: 0; padding-top: 12px; }
+.pill { margin-left: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 10px; background: var(--green-hi); color: #111; vertical-align: 2px; }
+.compare-table a { text-decoration: none; }
+.matched { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.matched strong { color: var(--text); }
+.pill.warn { background: var(--sale); }
+.report { margin: 10px 0 0; font-size: 12px; }
+.report a { color: var(--muted); }
+.report a:hover { color: var(--text); }
+.btn.steam { background: #2a475e; }
+.btn.steam:hover { background: #355a77; }
 
 .pager { display: flex; justify-content: center; margin-top: 24px; }
 .empty { color: var(--muted); grid-column: 1 / -1; text-align: center; padding: 60px 0; }
@@ -115,13 +158,18 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .chart { grid-column: 1 / -1; }
 .chart h3 { margin: 0 0 8px; font-size: 14px; }
 .chart svg { width: 100%; height: 180px; display: block; }
-.chart .note { color: var(--muted); font-size: 12px; }
+.note { color: var(--muted); font-size: 12px; }
 .links { display: flex; gap: 8px; flex-wrap: wrap; }
 .links a { text-decoration: none; }
 
 @media (max-width: 600px) {
   .topbar, .tabs, .filters, main { padding-left: 16px; padding-right: 16px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-  .detail-body { grid-template-columns: 1fr; }
+  .detail-body { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 14px; }
+  .compare { padding: 8px; }
+  .compare-table th, .compare-table td { padding: 6px 5px; font-size: 13px; }
+  .compare-table tbody th { font-size: 10px; width: 28%; }
+  .compare-table .btn { padding: 6px 8px; font-size: 12px; }
+  .pill { display: block; width: fit-content; margin: 4px 0 0; }
   .detail-body img { max-width: 160px; }
 }

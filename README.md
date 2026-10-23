@@ -22,6 +22,45 @@ Funciona de dos formas:
 - Detalle con historial de precio (gráfico) y link a la tienda.
 - Varios mercados (`SCRAPE_LOCALES=es-AR,es-MX,…`); cada uno tiene su propio historial.
 
+## Comparación con Steam
+
+Cada juego de Xbox se empareja con su equivalente en Steam (`src/steam.js`). La comparación aparece en la tarjeta
+(una fila por tienda, con la más barata resaltada), en el detalle (una tabla Xbox vs Steam con historial de las
+dos) y en los avisos de Discord. Filtros: **Más barato en Xbox / en Steam**, **En oferta en Steam**, **En oferta
+en las dos**, y el orden **Mayor diferencia con Steam**.
+
+**Cómo se empareja, para que no compare cosas distintas:**
+
+1. **Nombre**: los nombres se normalizan (sin ™, sin "(PC)" ni "para Xbox One…", y "Edición Definitiva" pasa a
+   "Definitive Edition") y se buscan **exactos** en la lista completa de juegos de Steam (~200.000, se baja con
+   `STEAM_API_KEY`). Los que no aparecen (por ejemplo, con el nombre en español) se buscan en la tienda, de a
+   `STEAM_MATCHES_PER_RUN` por actualización.
+2. **Empresa**: se confirma que el editor o desarrollador coincida (con alias como Microsoft = Xbox Game Studios).
+   Si no coincide, solo se acepta si el nombre es idéntico, único en Steam y no genérico. Así "Decay" o
+   "Extinction", que tienen varios juegos con el mismo nombre, no se comparan.
+3. **Edición**: entre las opciones de compra de Steam se elige la **misma edición** (la Digital Deluxe de Xbox se
+   compara con la Digital Deluxe de Steam). Si Steam no la tiene, se muestra la estándar como referencia, con la
+   etiqueta "Otra edición" y sin decir cuál conviene.
+
+Con la key, todo el catálogo se empareja en unos 3 minutos; sin la key, solo con búsquedas, lleva varios días.
+Las empresas y las ediciones salen de `IStoreBrowseService/GetItems`, que trae 100 juegos por pedido y no necesita key.
+
+**Transparencia y correcciones:**
+- El detalle dice con qué se comparó ("Comparado con *Dying Light 2 Stay Human: Reloaded Edition* · Techland").
+- El link **"¿La comparación está mal? Reportalo"** abre un issue en GitHub con los datos ya completados.
+- Para corregir, en `steam-overrides.json`: `"ID_XBOX": appid` fuerza el juego de Steam, y `"ID_XBOX": null` marca
+  que no tiene equivalente. Se aplica en la próxima actualización.
+- En cada juego, Steam aparece como "buscando…", "no está en Steam", "sin coincidencia segura" (no se pudo
+  confirmar que sea el mismo), "sin precio en Steam" (gratis o no se vende en ese país), o con el precio y cuál conviene.
+
+**Moneda**: en Argentina Steam cobra en USD y Xbox en pesos. Las dos tiendas suman los mismos impuestos al pagar
+(IVA 21% + IIBB), así que se comparan los precios base convirtiendo con el dólar de [dolarapi.com](https://dolarapi.com)
+(`STEAM_DOLLAR`, por defecto `oficial`; también `tarjeta`, `mep`, `blue`). En los otros mercados, Steam cobra en la
+misma moneda que Xbox.
+
+**En local:** `npm run steam` empareja y actualiza Steam sin volver a pedir los precios de Xbox. Con `npm run dev`
+abierto, recargá la página cuando termine.
+
 ## Publicar gratis en GitHub Pages
 
 Cómo funciona: `.github/workflows/update.yml` corre cada 6 h en GitHub Actions. Recupera la base SQLite de la rama
@@ -43,12 +82,15 @@ la rama `data`, siempre en un solo commit que se pisa, así el repo no crece. La
    git push -u origin main
    ```
 3. En el repo: **Settings → Pages → Source: GitHub Actions**.
-4. (Opcional) Alertas en Discord: en tu servidor de Discord, **Editar canal → Integraciones → Webhooks →
+4. Comparación con Steam: sacá una key en <https://steamcommunity.com/dev/apikey> y guardala en
+   **Settings → Secrets and variables → Actions → New repository secret** con el nombre `STEAM_API_KEY`.
+   Sin la key también funciona, pero el emparejamiento tarda días en completarse.
+5. (Opcional) Alertas en Discord: en tu servidor de Discord, **Editar canal → Integraciones → Webhooks →
    Nuevo webhook → Copiar URL**. En GitHub: **Settings → Secrets and variables → Actions → New repository secret**,
    nombre `DISCORD_WEBHOOK_URL`.
-5. (Opcional) En la misma pantalla, pestaña **Variables**: `SCRAPE_LOCALES` (ej. `es-AR,es-MX`),
+6. (Opcional) En la misma pantalla, pestaña **Variables**: `SCRAPE_LOCALES` (ej. `es-AR,es-MX`),
    `DISCORD_MIN_DISCOUNT` (50), `DISCORD_TOP_RANK` (100).
-6. **Actions → Actualizar precios y publicar → Run workflow** para la primera carga. Tarda unos 2 minutos y al
+7. **Actions → Actualizar precios y publicar → Run workflow** para la primera carga. Tarda unos 2 minutos y al
    terminar muestra la URL del sitio.
 
 Para tener en cuenta:

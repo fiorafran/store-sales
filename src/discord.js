@@ -5,6 +5,7 @@ import { db } from './db.js';
 import { cached } from './cache.js';
 import { DISCORD } from './config.js';
 import { onScrapeDone } from './scraper.js';
+import { steamComparison } from './steam.js';
 
 const LOCALE = DISCORD.locale;
 const COLORS = { sale: 0xffd23f, drop: 0x4fc3f7, info: 0x107c10 };
@@ -51,10 +52,26 @@ function gameEmbed(g, { title, color } = {}) {
   }
   if (g.sale_end) fields.push({ name: 'Oferta termina', value: discordDate(g.sale_end), inline: true });
   if (g.game_pass || g.gamePass) fields.push({ name: 'Game Pass', value: 'Incluido', inline: true });
+  const steam = steamField(g);
+  if (steam) fields.push(steam);
   if (fields.length) embed.addFields(fields);
   const img = imageUrl(g.image);
   if (img) embed.setThumbnail(img);
   return embed;
+}
+
+// "Steam: $ 7.750 (USD 5) · 🟢 Xbox 40% menos"
+function steamField(g) {
+  const s = steamComparison(g.id, LOCALE, g);
+  if (!s) return null;
+  let value = `[${s.priceLocal !== null ? money(s.priceLocal, g.currency) : `${s.currency} ${s.price}`}](https://store.steampowered.com/app/${s.appid})`;
+  if (s.currency !== g.currency) value += ` (${s.currency} ${s.price})`;
+  if (s.discount > 0) value += ` -${s.discount}%`;
+  if (s.cheaper === 'xbox') value += `\n🟢 Xbox ${s.diffPct}% menos`;
+  if (s.cheaper === 'steam') value += `\n🔴 Steam ${s.diffPct}% menos`;
+  if (s.cheaper === 'equal') value += '\n⚪ Mismo precio';
+  if (s.edition === 'standard_only') value += '\n⚠️ Steam solo tiene la edición estándar (referencia)';
+  return { name: 'Steam', value, inline: false };
 }
 
 // Lista compacta para /ofertas, /seguidos, /bajadas (una sola embed con hasta 15 líneas)

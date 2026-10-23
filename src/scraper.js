@@ -62,6 +62,7 @@ function normalize(p) {
     id: p.productId,
     title: p.title,
     publisher: p.publisherName || p.developerName || '',
+    developer: p.developerName || '',
     image: p.images?.poster?.url || p.images?.boxArt?.url
       || Object.values(p.images || {}).flat().find((img) => img?.url)?.url || '',
     categories: JSON.stringify(p.categories || []),
@@ -80,11 +81,12 @@ function normalize(p) {
 }
 
 const upsertProduct = db.prepare(`
-  INSERT INTO products (id, title, publisher, image, categories, platforms, rating, rating_count, release_date, game_pass)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO products (id, title, publisher, image, categories, platforms, rating, rating_count, release_date, game_pass, developer)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET title=excluded.title, publisher=excluded.publisher, image=excluded.image,
     categories=excluded.categories, platforms=excluded.platforms, rating=excluded.rating,
-    rating_count=excluded.rating_count, release_date=excluded.release_date, game_pass=excluded.game_pass
+    rating_count=excluded.rating_count, release_date=excluded.release_date, game_pass=excluded.game_pass,
+    developer=excluded.developer
 `);
 const getPrice = db.prepare('SELECT * FROM prices WHERE product_id = ? AND locale = ?');
 const insertPrice = db.prepare(`
@@ -107,7 +109,7 @@ const upsertRanking = db.prepare(`
 // Devuelve null si no cambió, o { oldPrice, newPrice } si cambió.
 function savePrice(locale, item, now) {
   upsertProduct.run(item.id, item.title, item.publisher, item.image, item.categories, item.platforms,
-    item.rating, item.ratingCount, item.releaseDate, item.gamePass);
+    item.rating, item.ratingCount, item.releaseDate, item.gamePass, item.developer);
 
   const current = getPrice.get(item.id, locale);
   if (!current) {

@@ -5,6 +5,7 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { db } from './db.js';
 import { scrape } from './scraper.js';
+import { updateSteam } from './steam.js';
 import { exportMeta, exportLocale } from './export.js';
 import { highlightMessages } from './discord.js';
 import { SCRAPE_LOCALES, DISCORD } from './config.js';
@@ -25,6 +26,7 @@ async function sendWebhook(message) {
 if (!process.argv.includes('--no-scrape')) {
   for (const locale of SCRAPE_LOCALES) {
     const { drops } = await scrape(locale);
+    await updateSteam(locale);
     if (!WEBHOOK || locale !== DISCORD.locale) continue;
     for (const message of highlightMessages(locale, drops)) {
       try { await sendWebhook(message); } catch (err) { console.error('[webhook]', err.message); }

@@ -91,6 +91,7 @@ function renderStatus(serverStatus) {
   } else {
     $('status').textContent = d?.updatedAt
       ? `${d.games.length} juegos · actualizado ${timeAgo(d.updatedAt)}${d.lastError ? ' (con error)' : ''} · auto cada ${state.meta.refreshHours} h`
+        + (d.fx ? ` · Steam: ${d.fx.from} 1 = ${money(d.fx.rate)} (${d.fx.source})` : '')
       : 'Sin datos todavía para este mercado.';
   }
   const btn = $('refresh');
@@ -118,6 +119,16 @@ const SORTS = {
   popular: (a, b) => rank(a, 'popular') - rank(b, 'popular'),
   wishlisted: (a, b) => rank(a, 'wishlisted') - rank(b, 'wishlisted'),
   sale_end: (a, b) => cmp(a.saleEnd ?? '9999', b.saleEnd ?? '9999'),
+  steam_diff: (a, b) => (b.steam?.diffPct ?? -1) - (a.steam?.diffPct ?? -1),
+};
+
+// Filtro "Comparación con Steam"
+const STEAM_FILTERS = {
+  has: (g) => g.steam.status === 'priced',
+  xbox: (g) => g.steam?.cheaper === 'xbox',
+  steam: (g) => g.steam?.cheaper === 'steam',
+  steamSale: (g) => g.steam?.discount > 0,
+  bothSale: (g) => g.discount > 0 && g.steam?.discount > 0,
 };
 const dropPct = (g) => (g.previousPrice ? (g.previousPrice - g.price) / g.previousPrice : 0);
 
@@ -141,6 +152,7 @@ function filteredGames() {
   const genre = $('genre').value;
   const gamePass = $('gamePass').value;
   const minDiscount = Number($('minDiscount').value);
+  const steamFilter = STEAM_FILTERS[$('steam').value];
   const sort = SORTS[$('sort').value || view.sort];
 
   return state.data.games
@@ -149,19 +161,79 @@ function filteredGames() {
       && (!platform || g.platforms.includes(platform))
       && (!genre || g.categories.includes(genre))
       && (!gamePass || g.gamePass === (gamePass === '1'))
+      && (!steamFilter || steamFilter(g))
       && g.discount >= minDiscount)
     .sort((a, b) => sort(a, b) || a.title.localeCompare(b.title));
 }
 
 // ---------- Listado ----------
 
+const VERDICT = { xbox: 'Xbox', steam: 'Steam', equal: 'Mismo precio' };
+const STEAM_STATUS_TEXT = {
+  pending: 'buscando…',
+  notFound: 'no está en Steam',
+  noPrice: 'sin precio en Steam',
+};
+const steamStatusText = (s) => (s.status === 'notFound' && s.reason === 'company'
+  ? 'sin coincidencia segura' : STEAM_STATUS_TEXT[s.status]);
+
+// Link para abrir un issue en GitHub con los datos del juego ya completados
+function reportUrl(g) {
+  const repo = state.data.reportRepo;
+  if (!repo) return null;
+  const s = g.steam;
+  const steam = s.appid ? `${s.itemName || s.name} (appid ${s.appid}, https://store.steampowered.com/app/${s.appid})` : steamStatusText(s);
+  const body = [
+    `**Xbox:** ${g.title} (ID \`${g.id}\`)`,
+    `**Steam:** ${steam}`,
+    '',
+    '**¿Qué está mal?** (ej. es otro juego, otra edición, sí está en Steam: pegá el link)',
+    '',
+    '',
+    '---',
+    `Para corregirlo, en \`steam-overrides.json\`: \`"${g.id}": APPID_CORRECTO\` o \`"${g.id}": null\` si no tiene equivalente.`,
+  ].join('\n');
+  const params = new URLSearchParams({ title: `Comparación incorrecta: ${g.title}`, body, labels: 'steam' });
+  return `https://github.com/${repo}/issues/new?${params}`;
+}
+
+function steamPrice(s, value = s.price) {
+  const factor = s.priceLocal !== null && s.price ? s.priceLocal / s.price : null;
+  return factor ? money(Math.round(value * factor * 100) / 100) : `${s.currency} ${value}`;
+}
+
+// Una fila por tienda: nombre, precio, precio tachado y descuento. La más barata se resalta.
+function storeRow(name, cls, { price, msrp, discount }, best) {
+  return `<div class="store-row ${cls} ${best ? 'best' : ''}">
+    <span class="store">${name}</span>
+    <span class="price ${price === 'Gratis' ? 'free' : ''}">${price}</span>
+    ${msrp ? `<span class="old">${msrp}</span>` : ''}
+    ${discount > 0 ? `<span class="off ${cls}">-${discount}%</span>` : ''}
+  </div>`;
+}
+
 function card(g) {
+  const s = g.steam;
   const badges = [];
-  if (g.discount > 0) badges.push(`<span class="badge sale">-${g.discount}%</span>`);
+  if (g.discount > 0) badges.push(`<span class="badge sale">Xbox -${g.discount}%</span>`);
+  if (s.discount > 0) badges.push(`<span class="badge steam">Steam -${s.discount}%</span>`);
   if (g.dropped) badges.push(`<span class="badge drop">↓ Bajó</span>`);
   if (g.isLowest) badges.push(`<span class="badge lowest">Mínimo histórico</span>`);
   if (g.gamePass) badges.push(`<span class="badge gp">Game Pass</span>`);
   const on = state.following.has(g.id);
+  const xboxRow = storeRow('Xbox', 'xbox', {
+    price: money(g.price),
+    msrp: g.msrp > g.price ? money(g.msrp) : (!g.discount && g.dropped ? money(g.previousPrice) : ''),
+    discount: g.discount,
+  }, s.cheaper === 'xbox');
+  const steamRow = s.status === 'priced'
+    ? storeRow('Steam', 'steam', {
+      price: s.price === 0 ? 'Gratis' : steamPrice(s),
+      msrp: s.msrp > s.price ? steamPrice(s, s.msrp) : '',
+      discount: s.discount,
+    }, s.cheaper === 'steam')
+    : `<div class="store-row steam muted"><span class="store">Steam</span><span>${steamStatusText(s)}</span></div>`;
+  const editionNote = s.edition === 'standard_only' ? '<div class="meta">Steam: solo edición estándar (referencia)</div>' : '';
   return `
     <article class="card" data-id="${escapeHtml(g.id)}">
       <div class="cover">
@@ -171,12 +243,10 @@ function card(g) {
       </div>
       <div class="info">
         <div class="title">${escapeHtml(g.title)}</div>
-        <div class="meta">${g.discount > 0 && g.saleEnd ? daysLeft(g.saleEnd) : escapeHtml(g.publisher)}</div>
-        <div class="prices">
-          <span class="price ${g.price === 0 ? 'free' : ''}">${money(g.price)}</span>
-          ${g.msrp > g.price ? `<span class="old">${money(g.msrp)}</span>` : ''}
-          ${!g.discount && g.dropped ? `<span class="old">${money(g.previousPrice)}</span>` : ''}
-        </div>
+        <div class="meta">${g.discount > 0 && g.saleEnd ? `Oferta Xbox ${daysLeft(g.saleEnd)}` : escapeHtml(g.publisher)}</div>
+        <div class="store-rows">${xboxRow}${steamRow}</div>
+        ${editionNote}
+        ${s.cheaper ? `<div class="verdict ${s.cheaper}">${s.cheaper === 'equal' ? '= Mismo precio' : `✓ ${VERDICT[s.cheaper]} ${s.diffPct}% menos`}</div>` : ''}
       </div>
     </article>`;
 }
@@ -200,42 +270,103 @@ function render({ append = false } = {}) {
 
 // ---------- Detalle con historial ----------
 
+// Historial escalonado (el precio se mantiene hasta el siguiente cambio). Si hay Steam, segunda línea
+// convertida con el tipo de cambio actual.
 function historyChart(g) {
-  const history = g.history.map(([recorded_at, price, discount]) => ({ recorded_at, price, discount }));
-  if (history.length < 2) {
+  const toPoints = (history, factor = 1) =>
+    history.map(([recorded_at, price, discount]) => ({ t: new Date(recorded_at).getTime(), price: price * factor, discount }));
+  const series = [{ name: 'Xbox', color: '#2fbf3b', points: toPoints(g.history) }];
+  const factor = g.steam.status === 'priced' && g.steam.priceLocal !== null ? g.steam.priceLocal / g.steam.price || 1 : null;
+  if (g.steam.history?.length && factor) {
+    series.push({ name: 'Steam', color: '#66c0f4', points: toPoints(g.steam.history, factor) });
+  }
+  if (series.every((s) => s.points.length < 2) && series.length === 1) {
     return '<p class="note">Todavía hay un solo registro de precio. El historial se arma con cada actualización (cada vez que cambia el precio se guarda un punto).</p>';
   }
   const W = 700, H = 180, P = { l: 70, r: 12, t: 12, b: 24 };
-  const pts = [...history, { ...history.at(-1), recorded_at: new Date().toISOString() }];
-  const xs = pts.map((h) => new Date(h.recorded_at).getTime());
-  const ys = pts.map((h) => h.price);
-  const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
-  const yMax = Math.max(g.msrp, ...ys) * 1.05 || 1;
-  const sx = (x) => P.l + ((x - x0) / (x1 - x0 || 1)) * (W - P.l - P.r);
+  const now = Date.now();
+  const all = series.flatMap((s) => s.points);
+  const x0 = Math.min(...all.map((p) => p.t));
+  const yMax = Math.max(g.msrp, (g.steam?.msrp ?? 0) * (factor || 0), ...all.map((p) => p.price)) * 1.05 || 1;
+  const sx = (x) => P.l + ((x - x0) / (now - x0 || 1)) * (W - P.l - P.r);
   const sy = (y) => P.t + (1 - y / yMax) * (H - P.t - P.b);
-  // Escalonado: el precio se mantiene hasta el siguiente cambio
-  let d = `M${sx(xs[0])},${sy(ys[0])}`;
-  for (let i = 1; i < pts.length; i++) d += ` H${sx(xs[i])} V${sy(ys[i])}`;
+  const fmt = (t) => new Date(t).toLocaleDateString(state.locale, { day: 'numeric', month: 'short' });
   const ticks = [0, yMax / 2, yMax].map((v) =>
     `<text x="${P.l - 8}" y="${sy(v) + 4}" text-anchor="end" fill="#8b949c" font-size="11">${money(Math.round(v))}</text>
      <line x1="${P.l}" x2="${W - P.r}" y1="${sy(v)}" y2="${sy(v)}" stroke="#2b3035"/>`).join('');
-  const fmt = (t) => new Date(t).toLocaleDateString(state.locale, { day: 'numeric', month: 'short' });
-  const dots = history.map((h) =>
-    `<circle cx="${sx(new Date(h.recorded_at).getTime())}" cy="${sy(h.price)}" r="3.5" fill="#2fbf3b"><title>${fmt(h.recorded_at)}: ${money(h.price)}${h.discount ? ` (-${h.discount}%)` : ''}</title></circle>`).join('');
-  return `
+  const lines = series.map(({ name, color, points }) => {
+    let d = `M${sx(points[0].t)},${sy(points[0].price)}`;
+    for (let i = 1; i < points.length; i++) d += ` H${sx(points[i].t)} V${sy(points[i].price)}`;
+    d += ` H${sx(now)}`;
+    const dots = points.map((p) =>
+      `<circle cx="${sx(p.t)}" cy="${sy(p.price)}" r="3.5" fill="${color}"><title>${name} ${fmt(p.t)}: ${money(Math.round(p.price))}${p.discount ? ` (-${p.discount}%)` : ''}</title></circle>`).join('');
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>${dots}`;
+  }).join('');
+  const legend = series.length > 1
+    ? '<div class="legend"><span><i class="lx"></i>Xbox</span><span><i class="ls"></i>Steam (convertido al cambio de hoy)</span></div>'
+    : '';
+  return `${legend}
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Historial de precio">
-      ${ticks}
-      <path d="${d}" fill="none" stroke="#2fbf3b" stroke-width="2"/>
-      ${dots}
+      ${ticks}${lines}
       <text x="${P.l}" y="${H - 6}" fill="#8b949c" font-size="11">${fmt(x0)}</text>
       <text x="${W - P.r}" y="${H - 6}" fill="#8b949c" font-size="11" text-anchor="end">hoy</text>
     </svg>`;
 }
 
+// Tabla Xbox vs Steam: cada fila es un dato, cada columna una tienda. La columna más barata se resalta.
+function compareTable(g, xboxUrl) {
+  const s = g.steam;
+  const priced = s.status === 'priced';
+  const inUsd = priced && s.priceLocal !== null && s.currency !== state.data.currency;
+  const steamCell = (value) => (value === null || value === undefined ? '—'
+    : `${steamPrice(s, value)}${inUsd ? `<small>${escapeHtml(s.currency)} ${value}</small>` : ''}`);
+  const steamUrl = s.appid ? escapeHtml(`https://store.steampowered.com/app/${encodeURIComponent(s.appid)}`) : null;
+  const head = (name, cls, best) => `<th class="${cls} ${best ? 'best' : ''}">${name}${best ? '<span class="pill">Más barato</span>' : ''}</th>`;
+  const rows = [
+    ['Precio actual', `<strong>${money(g.price)}</strong>`, priced ? `<strong>${steamCell(s.price)}</strong>` : escapeHtml(steamStatusText(s))],
+    ['Precio original', money(g.msrp), priced ? steamCell(s.msrp) : '—'],
+    ['Descuento', g.discount ? `<span class="off xbox">-${g.discount}%</span>` : 'Sin oferta', priced ? (s.discount ? `<span class="off steam">-${s.discount}%</span>` : 'Sin oferta') : '—'],
+    ['Mínimo registrado', money(g.lowestPrice), priced ? steamCell(s.lowestPrice) : '—'],
+    ['Oferta hasta', g.saleEnd ? new Date(g.saleEnd).toLocaleDateString(state.locale) : '—', '—'],
+  ];
+  const steamName = s.appid ? (s.itemName || s.name) : null;
+  const report = reportUrl(g);
+  const matchedWith = steamName
+    ? `<p class="matched">Comparado con <strong>${escapeHtml(steamName)}</strong> en Steam${s.company ? ` · ${escapeHtml(s.company)}` : ''}${s.edition === 'standard_only' ? ' <span class="pill warn">Otra edición</span>' : ''}</p>`
+    : '';
+  const footer = report
+    ? `<p class="report"><a href="${escapeHtml(report)}" target="_blank" rel="noopener">¿La comparación está mal o el juego sí está en Steam? Reportalo</a></p>`
+    : '';
+  return `${matchedWith}
+    <table class="compare-table">
+      <thead><tr><th></th>${head('Xbox', 'xbox', s.cheaper === 'xbox')}${head('Steam', 'steam', s.cheaper === 'steam')}</tr></thead>
+      <tbody>${rows.map(([label, x, st]) => `<tr><th>${label}</th><td class="xbox ${s.cheaper === 'xbox' ? 'best' : ''}">${x}</td><td class="steam ${s.cheaper === 'steam' ? 'best' : ''}">${st}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><th></th>
+        <td><a class="btn" href="${xboxUrl}" target="_blank" rel="noopener">Ver en Xbox</a></td>
+        <td>${steamUrl ? `<a class="btn steam" href="${steamUrl}" target="_blank" rel="noopener">Ver en Steam</a>` : ''}</td>
+      </tr></tfoot>
+    </table>${footer}`;
+}
+
+// Resumen en una frase: dónde está la oferta y dónde conviene
+function verdictText(g) {
+  const s = g.steam;
+  const sale = [g.discount > 0 && `en oferta en Xbox (-${g.discount}%)`, s.discount > 0 && `en oferta en Steam (-${s.discount}%)`].filter(Boolean);
+  const saleText = sale.length ? `Está ${sale.join(' y ')}.` : 'Sin ofertas en ninguna de las dos tiendas.';
+  if (s.status !== 'priced') return `${saleText} En Steam: ${steamStatusText(s)}.`;
+  if (s.edition === 'standard_only') {
+    return `${saleText} Steam no vende esta edición: la estándar cuesta ${steamPrice(s)} (solo como referencia, no es comparable).`;
+  }
+  if (!s.cheaper) return saleText;
+  if (s.cheaper === 'equal') return `${saleText} Cuesta prácticamente lo mismo en las dos.`;
+  const diff = Math.abs(g.price - s.priceLocal);
+  return `${saleText} <strong class="verdict ${s.cheaper}">${VERDICT[s.cheaper]} ${s.diffPct}% menos</strong> (${money(Math.round(diff))} de diferencia).`;
+}
+
 function openDetail(id) {
   const g = state.byId.get(id);
   if (!g) return;
-  const storeUrl = escapeHtml(`https://www.xbox.com/${encodeURIComponent(state.locale)}/games/store/x/${encodeURIComponent(id)}`);
+  const xboxUrl = escapeHtml(`https://www.xbox.com/${encodeURIComponent(state.locale)}/games/store/x/${encodeURIComponent(id)}`);
   const on = state.following.has(id);
   const stat = (label, value) => `<div class="stat"><span>${label}</span><strong>${value}</strong></div>`;
   $('detailBody').innerHTML = `
@@ -245,20 +376,18 @@ function openDetail(id) {
       <h2>${escapeHtml(g.title)}</h2>
       <div class="meta">${escapeHtml(g.publisher)} · ${escapeHtml(g.platforms.map((p) => PLATFORM_NAMES[p] || p).join(', '))}</div>
       <div class="meta">${escapeHtml(g.categories.join(', '))}</div>
+      <p class="summary">${verdictText(g)}</p>
       <div class="stats">
-        ${stat('Precio actual', money(g.price))}
-        ${stat('Precio original', money(g.msrp))}
-        ${stat('Descuento', g.discount ? `-${g.discount}%` : '—')}
-        ${stat('Mínimo registrado', money(g.lowestPrice))}
-        ${g.previousPrice !== null ? stat('Precio anterior', money(g.previousPrice)) : ''}
-        ${g.saleEnd ? stat('Oferta hasta', new Date(g.saleEnd).toLocaleDateString(state.locale)) : ''}
+        ${g.previousPrice !== null ? stat('Antes en Xbox', money(g.previousPrice)) : ''}
         ${g.ranks.popular ? stat('Ranking popular', `#${g.ranks.popular}`) : ''}
         ${g.rating ? stat('Valoración', `${g.rating.toFixed(1)} ★ (${g.ratingCount})`) : ''}
+        ${g.gamePass ? stat('Game Pass', 'Incluido') : ''}
       </div>
-      <div class="links">
-        <a class="btn" href="${storeUrl}" target="_blank" rel="noopener">Ver en la tienda</a>
-        <button class="btn ghost" data-star="${escapeHtml(id)}">${on ? '★ Siguiendo' : '☆ Seguir'}</button>
-      </div>
+      <button class="btn ghost" data-star="${escapeHtml(id)}">${on ? '★ Siguiendo' : '☆ Seguir'}</button>
+    </div>
+    <div class="compare">
+      ${compareTable(g, xboxUrl)}
+      ${state.data.fx && g.steam.status === 'priced' ? `<p class="note">Steam cobra en ${escapeHtml(state.data.fx.from)}; convertido con ${escapeHtml(state.data.fx.source)} (${escapeHtml(state.data.fx.from)} 1 = ${money(state.data.fx.rate)}). Las dos tiendas suman los mismos impuestos al pagar (IVA + IIBB), por eso se comparan los precios base.</p>` : ''}
     </div>
     <div class="chart">
       <h3>Historial de precio</h3>
@@ -291,7 +420,7 @@ $('tabs').addEventListener('click', (e) => {
 
 let searchTimer;
 $('q').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(render, 150); });
-for (const id of ['platform', 'genre', 'gamePass', 'sort']) $(id).addEventListener('change', () => render());
+for (const id of ['platform', 'genre', 'gamePass', 'steam', 'sort']) $(id).addEventListener('change', () => render());
 $('minDiscount').addEventListener('input', (e) => { $('minDiscountLabel').textContent = `${e.target.value}%`; });
 $('minDiscount').addEventListener('change', () => render());
 
