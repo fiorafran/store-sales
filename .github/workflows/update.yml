@@ -1,0 +1,75 @@
+name: Actualizar precios y publicar
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'   # cada 6 h (GitHub puede demorarlo unos minutos)
+  workflow_dispatch:          # botón "Run workflow" para actualizar a mano
+  push:
+    branches: [main]          # al cambiar el código se republica el sitio, sin volver a pedir precios
+
+permissions:
+  contents: write   # guardar la base en la rama "data"
+  pages: write
+  id-token: write
+
+# Nunca dos actualizaciones a la vez
+concurrency:
+  group: update-prices
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Recuperar la base de datos de la rama "data"
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin data; then
+            git show origin/data:store.db > data/store.db
+            echo "Base recuperada ($(du -h data/store.db | cut -f1))"
+          else
+            echo "Primera ejecución: se crea una base nueva"
+          fi
+
+      - name: Actualizar precios y generar el sitio
+        run: npm run build ${{ github.event_name == 'push' && '-- --no-scrape' || '' }}
+        env:
+          SCRAPE_LOCALES: ${{ vars.SCRAPE_LOCALES || 'es-AR' }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_MIN_DISCOUNT: ${{ vars.DISCORD_MIN_DISCOUNT || '50' }}
+          DISCORD_TOP_RANK: ${{ vars.DISCORD_TOP_RANK || '100' }}
+
+      # Un solo commit que se pisa cada vez: el repo no crece con cada actualización
+      - name: Guardar la base de datos en la rama "data"
+        if: github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tmp=$(mktemp -d)
+          cp data/store.db "$tmp/"
+          cd "$tmp"
+          git init -q -b data
+          git add store.db
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Datos $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

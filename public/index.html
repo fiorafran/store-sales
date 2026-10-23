@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- En hosting estático (GitHub Pages) no hay headers propios: la política de seguridad va acá -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https://store-images.s-microsoft.com; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Store Sales</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <div>
+        <h1>Store Sales</h1>
+        <p class="status" id="status">Cargando…</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <select id="locale" aria-label="Mercado"></select>
+      <button id="refresh" class="btn" hidden>Actualizar precios</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-view="deals" class="active">En oferta <span class="count" id="count-deals"></span></button>
+    <button data-view="drops">Bajaron de precio <span class="count" id="count-drops"></span></button>
+    <button data-view="lowest">Mínimo histórico</button>
+    <button data-view="popular">Más populares</button>
+    <button data-view="wishlisted">Más deseados</button>
+    <button data-view="newest">Novedades</button>
+    <button data-view="free">Gratis</button>
+    <button data-view="all">Todos</button>
+    <button data-view="following">★ Seguidos</button>
+  </nav>
+
+  <section class="filters">
+    <input id="q" type="search" placeholder="Buscar juego…">
+    <select id="platform">
+      <option value="">Todas las plataformas</option>
+      <option value="XboxSeriesX">Xbox Series X|S</option>
+      <option value="XboxOne">Xbox One</option>
+      <option value="PC">PC</option>
+      <option value="XCloud">Cloud</option>
+      <option value="Handheld">Handheld</option>
+    </select>
+    <select id="genre"><option value="">Todos los géneros</option></select>
+    <select id="gamePass">
+      <option value="">Game Pass: todos</option>
+      <option value="1">Incluido en Game Pass</option>
+      <option value="0">Sin Game Pass</option>
+    </select>
+    <label class="range">Descuento mín. <strong id="minDiscountLabel">0%</strong>
+      <input id="minDiscount" type="range" min="0" max="90" step="10" value="0">
+    </label>
+    <select id="sort">
+      <option value="">Orden por defecto</option>
+      <option value="discount">Mayor descuento</option>
+      <option value="drop">Mayor bajada de precio</option>
+      <option value="price_asc">Precio: menor a mayor</option>
+      <option value="price_desc">Precio: mayor a menor</option>
+      <option value="popular">Más populares</option>
+      <option value="wishlisted">Más deseados</option>
+      <option value="rating">Mejor valorados</option>
+      <option value="newest">Lanzamiento más reciente</option>
+      <option value="sale_end">La oferta termina antes</option>
+      <option value="title">Nombre A-Z</option>
+    </select>
+  </section>
+
+  <main>
+    <p class="result-info" id="resultInfo"></p>
+    <div class="grid" id="grid"></div>
+    <div class="pager">
+      <button id="more" class="btn ghost" hidden>Cargar más</button>
+    </div>
+  </main>
+
+  <dialog id="detail">
+    <div class="detail-body" id="detailBody"></div>
+  </dialog>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

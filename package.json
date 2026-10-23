@@ -1,0 +1,20 @@
+{
+  "name": "store-sales",
+  "version": "1.0.0",
+  "description": "Rastreador de ofertas y bajadas de precio de juegos en Microsoft Store / Xbox",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --no-warnings --env-file-if-exists=.env src/server.js",
+    "dev": "node --no-warnings --env-file-if-exists=.env --watch src/server.js",
+    "scrape": "node --no-warnings --env-file-if-exists=.env src/scrape-cli.js",
+    "build": "node --no-warnings --env-file-if-exists=.env src/build.js"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0",
+    "express": "^4.21.2"
+  }
+}
